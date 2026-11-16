@@ -1,216 +1,209 @@
 package frc.robot;
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.HttpCamera;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
+
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.revrobotics.spark.config.SparkBaseConfig;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
+
 import frc.robot.commands.AutoAimToTag;
-import frc.robot.commands.AutoHangToTag;
-import frc.robot.commands.ShootWhileMoving;
-import frc.robot.subsystems.Climb;
+import frc.robot.commands.ShootWhenReadyAuto;
+
 import frc.robot.subsystems.Drive;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 
 import static frc.robot.Constants.*;
-import static frc.robot.Utils.getSpeed2;
 
 public class RobotContainer {
-    private final SendableChooser<Command> autoChooser;
+
     private final Drive drive = new Drive();
     private final Shooter shooter = new Shooter();
-    private final Climb climb = new Climb(drive);
     private final Intake intake = new Intake();
 
     private final CommandXboxController m_driverController = new CommandXboxController(0);
+    private final CommandXboxController m_operatorController = new CommandXboxController(1);
 
-    private final Command shootCommand = new ShootWhileMoving(drive, shooter, m_driverController, intake);
+    private final SendableChooser<Command> autoChooser;
+    private final SendableChooser<String> allianceChooser = new SendableChooser<>();
+    private final SendableChooser<Boolean> fieldOrientedChooser = new SendableChooser<>();
+
     public RobotContainer() {
+        // Limelight setup
+        LimelightHelpers.setPipelineIndex("limelight", 0);
+        LimelightHelpers.setStreamMode_Standard("limelight");
+        HttpCamera limelightFeed = new HttpCamera("Limelight", "http://10.91.39.11");
+
+    CameraServer.addCamera(limelightFeed);
+
+    Shuffleboard.getTab("Drive")
+        .add("Limelight Video", limelightFeed)
+        .withWidget(BuiltInWidgets.kCameraStream)
+        .withSize(4, 3) // Adjust size as needed
+        .withPosition(0, 0);
+
+    
+
+
+        // Auto chooser
         autoChooser = AutoBuilder.buildAutoChooser();
         SmartDashboard.putData("Auto Chooser", autoChooser);
-        NamedCommands.registerCommand("shoot command", Commands.repeatingSequence(new ShootWhileMoving(drive, shooter, m_driverController, intake)).withTimeout(6));
+
+        // Named commands for auto
+        NamedCommands.registerCommand("shooting", new ShootWhenReadyAuto(shooter, 2700, 5.0));
         NamedCommands.registerCommand("toggle intake", intake.toggleIntake());
-        NamedCommands.registerCommand("intake", Commands.repeatingSequence(intake.intake()).withTimeout(3));
+        NamedCommands.registerCommand("intake", intake.intake().withTimeout(3));
+
+        // Alliance chooser
+        allianceChooser.setDefaultOption("Red", "Red");
+        allianceChooser.addOption("Blue", "Blue");
+        SmartDashboard.putData("Alliance Color", allianceChooser);
+
+        // Drive mode chooser
+        fieldOrientedChooser.setDefaultOption("Field Oriented", false);
+        fieldOrientedChooser.addOption("Robot Oriented", true);
+        SmartDashboard.putData("Drive Mode", fieldOrientedChooser);
+
         configureBindings();
     }
-    /**
-     * Use this method to define your trigger->command mappings. Triggers can be
-     * created via the
-     * {@link Trigger#Trigger(java.util.function.BooleanSupplier)} constructor with
-     * an arbitrary
-     * predicate, or via the named factories in {@link
-     * edu.wpi.first.wpilibj2.command.button.CommandGenericHID}'s subclasses for
-     * {@link
-     * CommandXboxController
-     * Xbox}/{@link edu.wpi.first.wpilibj2.command.button.CommandPS4Controller
-     * PS4} controllers or
-     * {@link edu.wpi.first.wpilibj2.command.button.CommandJoystick Flight
-     * joysticks}.
-     */
+
     private void configureBindings() {
+
+        // Default drive command
         drive.setDefaultCommand(
             new RunCommand(() -> {
                 var controls = getControls(m_driverController);
-                var thetaInput = -m_driverController.getRightX() * MAX_ANGULAR_SPEED;
-                drive.drive(controls.getX(), controls.getY(), thetaInput, true);
+                var thetaInput = m_driverController.getRightX() * MAX_ANGULAR_SPEED * 0.5;
+                boolean fieldOriented = fieldOrientedChooser.getSelected();
+                drive.drive(controls.getX(), controls.getY(), thetaInput, fieldOriented);
+            }, drive)
+        );
+        
+    
+        // Start: Reset heading
+        var resetHeading = Commands.runOnce(drive::zeroPose, drive);
+        resetHeading.runsWhenDisabled();
+        m_driverController.start().onTrue(resetHeading);
 
-            }, drive));
+        // Left Trigger: Auto-align with vision
+        m_driverController.leftTrigger().whileTrue(new AutoAimToTag(drive, m_driverController));
 
-        // m_driverController.b().whileTrue(
-        // getDriveToGoal(new Pose2d(new Translation2d(14.8, 4.09),
-        // Rotation2d.fromDegrees(180)), Rotation2d.fromDegrees(0))
-        // );
-        var restHeadingCommand = Commands.runOnce(drive::zeroPose, drive);
-        restHeadingCommand.runsWhenDisabled();
-        m_driverController.start().onTrue(restHeadingCommand);
+        // Right Trigger: Autoshoot (spin + auto-fire when ready)
+        m_operatorController.rightTrigger().whileTrue(
+            Commands.runEnd(
+                () -> shooter.setShooterSpeed(CLOSE_RANGE_RPM, true, true),
+                () -> shooter.stopAll(),
+                shooter
+            )
+        );
 
-        m_driverController.leftTrigger().whileTrue(intake.intake());
-        m_driverController.leftBumper().whileTrue(intake.outtake());
-        m_driverController.rightBumper().onTrue(intake.toggleIntake());
+        // Left Trigger: Shooter spinup only (no feeder)
+        m_operatorController.leftTrigger().whileTrue(
+            Commands.runEnd(
+                () -> shooter.setShooterSpeed(CLOSE_RANGE_RPM, false, false),
+                () -> shooter.stopAll(),
+                shooter
+            )
+        );
 
-        m_driverController.rightTrigger().whileTrue(Commands.parallel(shootCommand));
+        // Right Bumper: Feeder forward (manual)
+        m_operatorController.rightBumper().whileTrue(
+            Commands.runEnd(
+                () -> shooter.testFeederDirect(),
+                () -> shooter.stopFeeder(),
+                shooter
+            )  
+        );
 
-        // --- LIMELIGHT APRILTAG ASSISTS ---
-        // Hold LB for "aim only" (keeps your translation control, but rotates to face the visible tag)
-        m_driverController.leftStick().whileTrue(new AutoAimToTag(drive, m_driverController));
+        // Left Bumper: Feeder reverse
+        m_operatorController.leftBumper().whileTrue(
+            Commands.runEnd(
+                () -> shooter.setOuttake(),
+                () -> shooter.stopFeeder(),
+                shooter
+            )
+        );
 
-        // Hold RB + B for "auto hang" (drives to a set distance from the visible tag, then extends climb)
-        m_driverController.rightStick().whileTrue(new AutoHangToTag(drive, climb));
+        // A: Intake
+        m_operatorController.a().whileTrue(intake.intake());
 
-        m_driverController.a().whileTrue(Commands.run(
-            () -> {
-                boolean isAtSpeed = shooter.isAtSpeed(1700);
-                shooter.setShooterSpeed(1700, false);
-                shooter.setFiring(isAtSpeed);
-            }, shooter));
+        // B: Outtake
+        m_operatorController.b().whileTrue(intake.outtake());
 
-        m_driverController.y().whileTrue(Commands.runEnd(
-            () -> {
-                shooter.setShooterSpeed(-1700, false);
-                shooter.setOuttake();
-            }, () -> {
-                shooter.setShooterSpeed(0, false);
-                shooter.setFiring(false);
-            }, shooter));
+        // X: Intake arm down
+        m_operatorController.x().onTrue(intake.intakeDown());
+    
+        // Y: Intake arm up
+        m_operatorController.y().onTrue(intake.intakeUp());
+    }
 
+    public static Translation2d getControls(CommandXboxController controller) {
+        boolean isRed = DriverStation.getAlliance()
+                .orElse(DriverStation.Alliance.Red) == DriverStation.Alliance.Red;
 
-        m_driverController.x().whileTrue(Commands.run(
-            () -> {
-                shooter.setShooterSpeed(1700, false);
-            }, shooter));
+        double forward = controller.getLeftY();
+        double strafe = controller.getLeftX();
 
-        m_driverController.b().whileTrue(Commands.run(() -> shooter.setFiring(true)));
+        forward = Math.copySign(forward * forward, forward);
+        strafe = Math.copySign(strafe * strafe, strafe);
 
-        // m_driverController.a().whileTrue(Commands.sequence(
-        // Commands.race(
-        // getDriveToGoal(new Pose2d(6, 7, Rotation2d.fromDegrees(90)),
-        // Rotation2d.fromDegrees(0), normConstraints),
-        // Commands.waitUntil(() ->
-        // LimelightHelpers.getFiducialID(Constants.LIMELIGHT_NAME) == 15)
-        // ),
-        // Commands.waitSeconds(0.5),
-        // getDriveToGoal(new Pose2d(6, 7, Rotation2d.fromDegrees(90)),
-        // Rotation2d.fromDegrees(0), normConstraints),
-        // climb.extend(false)
-        // ));
+        if (isRed) {
+            forward = forward;
+        }
 
-        // m_driverController.x().whileTrue(Commands.sequence(
-        // Commands.parallel(
-        // climb.setVoltageWithFeedforward(3, drive).until(() ->
-        // drive.getGyroPitch().getDegrees() >= 180),
-        // Commands.run(() -> drive.drive(0.2, 0, 0, true)).until(() ->
-        // drive.getGyroPitch().getDegrees() >= 30)
-        // ),
-        // climb.fixPIDPositionReference(drive.getGyroPitch().getRadians())
-        // ));
+        forward *= MAX_LINEAR_SPEED_TELEOP;
+        strafe *= MAX_LINEAR_SPEED_TELEOP;
 
-        m_driverController.povLeft().onTrue(climb.extend(false));
-        m_driverController.povUp().whileTrue(climb.setVoltageWithFeedforward(12, drive, true)
-            .alongWith(climb.extend(true)));
-        m_driverController.povDown().onTrue(Commands.run(() -> {
-            shooter.setFiring(false);
-            shooter.setShooterSpeed(0, false);
-        }, shooter));
-        m_driverController.povDown().whileTrue(climb.setVoltageWithFeedforward(-7, drive, false));
-
+        return new Translation2d(forward, strafe);
     }
 
     public static boolean isRed() {
-        return DriverStation.getAlliance().orElse(Alliance.Red) == Alliance.Red;
-
+        return DriverStation.getAlliance()
+                .orElse(DriverStation.Alliance.Red) == DriverStation.Alliance.Red;
     }
 
-    public static Translation2d getControls(CommandXboxController m_driverController) {
-
-        // var yInput = Math.abs(m_driverController.getLeftY()) *
-        // m_driverController.getLeftY() * MAX_LINEAR_SPEED_TELEOP;
-        // var xInput = -Math.abs(m_driverController.getLeftX()) *
-        // m_driverController.getLeftX() * MAX_LINEAR_SPEED_TELEOP;
-        var isRed = DriverStation.getAlliance().orElse(Alliance.Red) == Alliance.Red;
-        double xInput;
-        double yInput;
-        if (!isRed) {
-            xInput = -Math.abs(m_driverController.getLeftY()) * m_driverController.getLeftY()
-                * MAX_LINEAR_SPEED_TELEOP;
-            yInput = -Math.abs(m_driverController.getLeftX()) * m_driverController.getLeftX()
-                * MAX_LINEAR_SPEED_TELEOP;
-        } else {
-            xInput = Math.abs(m_driverController.getLeftY()) * m_driverController.getLeftY()
-                * MAX_LINEAR_SPEED_TELEOP;
-            yInput = Math.abs(m_driverController.getLeftX()) * m_driverController.getLeftX()
-                * MAX_LINEAR_SPEED_TELEOP;
+    public static double getDistanceToTarget() {
+        if (!LimelightHelpers.getTV("limelight")) {
+            return -1.0;
         }
 
-        return new Translation2d(xInput, yInput);
+        double ty = LimelightHelpers.getTY("limelight");
+        double angleToTargetDeg = LIMELIGHT_MOUNT_ANGLE_DEG + ty;
+        double angleToTargetRad = Math.toRadians(angleToTargetDeg);
+
+        if (Math.abs(angleToTargetRad) < 0.01) {
+            return 999.0;
+        }
+
+        double distanceMeters = (HUB_TAG_HEIGHT_M - LIMELIGHT_HEIGHT_M)
+                / Math.tan(angleToTargetRad);
+
+        return Math.max(distanceMeters, 0.5);
     }
 
-    /**
-     * Use this to pass the autonomous command to the main {@link Robot} class.
-     *
-     * @return the command to run in autonomous
-     */
     public Command getAutonomousCommand() {
-
-        var isRed = DriverStation.getAlliance().orElse(Alliance.Red) == Alliance.Red;
-        double xInput;
-        double theta;
-        if (isRed) {
-            xInput = 0.5;
-            theta = 180;
-        } else {
-            xInput = -0.5;
-            theta = 0;
-        }
-
-        return AutoBuilder.buildAuto("New Auto");
-//
-//        return Commands.sequence(
-//            Commands.runOnce(() -> drive.resetPose(new Pose2d(drive.getPose().getX(), drive.getPose().getY(), Rotation2d.fromDegrees(theta)))),
-//            Commands.repeatingSequence(new ShootWhileMoving(drive, shooter, m_driverController, intake)).withTimeout(6)
-//            //AutoBuilder.followPath(PathPlannerPath.fromPathFile("p1"))
-//        );
+        return autoChooser.getSelected();
     }
 
     public void disabledInit() {
         CommandScheduler.getInstance().schedule(
             Commands.runOnce(() -> drive.setBrakeMode(SparkBaseConfig.IdleMode.kCoast))
                 .beforeStarting(Commands.waitSeconds(3.0))
-                .ignoringDisable(true));
+                .ignoringDisable(true)
+        );
     }
 
     public void enabledInit() {
         CommandScheduler.getInstance().schedule(
-            Commands.runOnce(() -> drive.setBrakeMode(SparkBaseConfig.IdleMode.kBrake)));
+            Commands.runOnce(() -> drive.setBrakeMode(SparkBaseConfig.IdleMode.kBrake))
+        );
     }
 }

@@ -23,10 +23,15 @@ public class TunerConstants {
 
     // The steer motor uses any SwerveModule.SteerRequestType control request with the
     // output type specified by SwerveModuleConstants.SteerMotorClosedLoopOutput
-    private static final Slot0Configs steerGains = new Slot0Configs()
-        .withKP(100).withKI(0).withKD(0.5)
-        .withKS(0.1).withKV(2.66).withKA(0)
-        .withStaticFeedforwardSign(StaticFeedforwardSignValue.UseClosedLoopSign);
+private static final Slot0Configs steerGains = new Slot0Configs()
+    .withKP(80)    // Lowered from 100 for a softer response
+    .withKI(0)
+    .withKD(0.5)
+    .withKS(0.1)
+    .withKV(2.0)   // Lowered from 2.66 to reduce max rotation speed
+    .withKA(0)
+    .withStaticFeedforwardSign(StaticFeedforwardSignValue.UseClosedLoopSign);
+
     // When using closed-loop control, the drive motor uses the control
     // output type specified by SwerveModuleConstants.DriveMotorClosedLoopOutput
     private static final Slot0Configs driveGains = new Slot0Configs()
@@ -61,7 +66,7 @@ public class TunerConstants {
             new CurrentLimitsConfigs()
                 // Swerve azimuth does not require much torque output, so we can set a relatively low
                 // stator current limit to help avoid brownouts without impacting performance.
-                .withStatorCurrentLimit(Amps.of(60))
+                .withStatorCurrentLimit(Amps.of(45))
                 .withStatorCurrentLimitEnable(true)
         );
     private static final CANcoderConfiguration encoderInitialConfigs = new CANcoderConfiguration();
@@ -283,4 +288,4 @@ public class TunerConstants {
             );
         }
     }
-}
+}

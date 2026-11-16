@@ -1,38 +1,50 @@
-// Copyright (c) FIRST and other WPILib contributors.
-// Open Source Software; you can modify and/or share it under the terms of
-// the WPILib BSD license file in the root directory of this project.
-
 package frc.robot;
 
 import com.pathplanner.lib.path.PathConstraints;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
 
-/**
- * The Constants class provides a convenient place for teams to hold robot-wide numerical or boolean
- * constants. This class should not be used for any other purpose. All constants should be declared
- * globally (i.e. public static). Do not put anything functional in this class.
- *
- * <p>It is advised to statically import this class (or one of its inner classes) wherever the
- * constants are needed, to reduce verbosity.
- */
 public final class Constants {
+
+    // PathPlanner and drive tolerances
     public static final double PATH_FINISH_CLOSE_DISTANCE_M = 0.2;
     public static final double PATH_FINISH_CLOSE_DISTANCE_M_PID = 0.03;
     public static final double ANGLE_CLOSE_RAD = Math.PI / 90;
 
-    public static String LIMELIGHT_NAME = "limelight";
-    public static double TICK_TIME = 20.0 / 1000.0; // 20ms
+    // Vision
+    public static final String LIMELIGHT_NAME = "limelight";
 
-    // These are used for input scaling and PathPlanner constraints.
-    // With CTRE swerve, we keep reasonable defaults that can be tuned as needed.
-    public static final double MAX_LINEAR_SPEED_AUTO = 4.0;
-    public static final double MAX_LINEAR_SPEED_TELEOP = 4.5;
-    public static final double MAX_SHOOTING_SPEED = 3.0;
-    public static final double MAX_ANGULAR_SPEED = Math.PI * 2;
+    // Drive speeds
+    public static final double MAX_LINEAR_SPEED_AUTO = 2.0;
+    public static final double MAX_LINEAR_SPEED_TELEOP = 2.5;
+    public static final double MAX_ANGULAR_SPEED = Math.PI * 0.75;
 
-    public static final double SHOOTER_VELOCITY_RANGE = 100;
-    public static final double SHOOT_ANGLE_RANGE_RAD = Units.degreesToRadians(2);
+    // Shooter
+    public static final double SHOOT_ANGLE_RANGE_RAD = Units.degreesToRadians(2.0);
 
-    public static final PathConstraints normConstraints = new PathConstraints(Constants.MAX_LINEAR_SPEED_AUTO, 5.0, Constants.MAX_ANGULAR_SPEED, 6 * Math.PI);
+    // Limelight distance calculation
+    public static final double LIMELIGHT_MOUNT_ANGLE_DEG = 25.0;
+    public static final double LIMELIGHT_HEIGHT_M = 0.1;
+    public static final double HUB_TAG_HEIGHT_M = 1.124;
 
+    // Fixed close-range shot
+    public static final double CLOSE_RANGE_RPM = 3300.0;
+    // Shooting / feeder
+    public static final double FEEDER_HAS_BALL_CURRENT_THRESHOLD = 30.0;
+    public static final double SHOOT_BOOST_TIME_S = 0.5;
+
+    // HUB positions
+    public static final Translation2d HUB_POS_RED = new Translation2d(
+            Units.inchesToMeters(469.11),
+            Units.inchesToMeters(158.84)
+    );
+
+    public static final Translation2d HUB_POS_BLUE = new Translation2d(
+            Units.inchesToMeters(182.11),
+            Units.inchesToMeters(158.84)
+    );
+
+    // Path constraints
+    public static final PathConstraints normConstraints =
+            new PathConstraints(MAX_LINEAR_SPEED_AUTO, 5.0, MAX_ANGULAR_SPEED, 6 * Math.PI);
 }
