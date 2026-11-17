@@ -122,14 +122,14 @@ public class Drive extends SubsystemBase {
     public void drive(double vxMps, double vyMps, double omegaRadPerSec, boolean fieldRelative) {
         if (fieldRelative) {
             drivetrain.setControl(fieldCentric
-                    .withVelocityX(-vxMps)
-                    .withVelocityY(-vyMps)
-                    .withRotationalRate(-omegaRadPerSec));
+                    .withVelocityX(vxMps)
+                    .withVelocityY(vyMps)
+                    .withRotationalRate(omegaRadPerSec));
         } else {
             drivetrain.setControl(robotCentric
-                    .withVelocityX(-vxMps)
-                    .withVelocityY(-vyMps)
-                    .withRotationalRate(-omegaRadPerSec));
+                    .withVelocityX(vxMps)
+                    .withVelocityY(vyMps)
+                    .withRotationalRate(omegaRadPerSec));
         }
     }
 

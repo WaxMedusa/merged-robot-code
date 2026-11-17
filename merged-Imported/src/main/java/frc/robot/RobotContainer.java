@@ -79,10 +79,10 @@ public class RobotContainer {
         SmartDashboard.putData("Alliance Color", allianceChooser);
 
         // Drive mode chooser — the boolean is passed straight to Drive.drive() as the
-        // `fieldRelative` flag, so true must mean field-oriented. (It was inverted:
-        // "Field Oriented" stored false, which made the default drive robot-centric.)
-        fieldOrientedChooser.setDefaultOption("Field Oriented", true);
-        fieldOrientedChooser.addOption("Robot Oriented", false);
+        // `fieldRelative` flag, so true means field-oriented, false means robot-centric.
+        // Default is robot-centric so the sticks map directly to robot motion.
+        fieldOrientedChooser.setDefaultOption("Robot Oriented", false);
+        fieldOrientedChooser.addOption("Field Oriented", true);
         SmartDashboard.putData("Drive Mode", fieldOrientedChooser);
 
         configureBindings();
