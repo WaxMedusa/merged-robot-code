@@ -21,13 +21,16 @@ public final class Constants {
 
     // Teleop input shaping — tune these from the Shuffleboard "Drive" tab.
     // Deadband: sticks below this value are treated as zero (kills stick creep).
-    public static final double DRIVE_DEADBAND = 0.08;
+    public static final double DRIVE_DEADBAND = 0.06;
     // Response curve exponent. 1.0 = linear, <1.0 = more sensitive at low speed,
-    // >1.0 = less sensitive at low speed (cubic = 3.0). 2.0 = quadratic (current behavior).
-    public static final double DRIVE_INPUT_EXPONENT = 2.0;
-    // Max rate of change of the commanded velocity (m/s per 20ms loop, rad/s per 20ms loop).
-    // This is what stops the robot from jerking when you whack the stick.
-    public static final double DRIVE_SLEW_RATE_LINEAR = 3.0;   // m/s per iteration
+    // >1.0 = less sensitive at low speed (cubic = 3.0). 1.5 = mild shaping so the
+    // full stick range is usable instead of only the top half.
+    public static final double DRIVE_INPUT_EXPONENT = 1.5;
+    // Max rate of change of the commanded velocity. This is what stops the robot
+    // from jerking when you whack the stick. One limiter per axis so X and Y
+    // don't fight each other.
+    public static final double DRIVE_SLEW_RATE_X = 3.0;        // m/s per iteration
+    public static final double DRIVE_SLEW_RATE_Y = 3.0;        // m/s per iteration
     public static final double DRIVE_SLEW_RATE_ANGULAR = 4.0; // rad/s per iteration
 
     // Shooter

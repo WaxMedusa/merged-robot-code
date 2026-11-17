@@ -34,10 +34,13 @@ public class RobotContainer {
     private final CommandXboxController m_operatorController = new CommandXboxController(1);
 
     // Slew-rate limiters smooth out sudden stick movements so the robot doesn't
-    // jerk when you whack the stick to full throttle. Shared across all commands
+    // jerk when you whack the stick to full throttle. One limiter per axis so the
+    // X and Y translation channels don't fight each other (sharing one limiter
+    // coupled the two axes and broke diagonal driving). Shared across all commands
     // that use getControls() (teleop + auto-aim + shoot-while-moving) because they
     // all feed the same drivetrain, so a single limiter keeps handoffs smooth.
-    public static final SlewLimiter m_linearSlew = new SlewLimiter(Constants.DRIVE_SLEW_RATE_LINEAR);
+    public static final SlewLimiter m_slewX = new SlewLimiter(Constants.DRIVE_SLEW_RATE_X);
+    public static final SlewLimiter m_slewY = new SlewLimiter(Constants.DRIVE_SLEW_RATE_Y);
     public static final SlewLimiter m_angularSlew = new SlewLimiter(Constants.DRIVE_SLEW_RATE_ANGULAR);
 
     private final SendableChooser<Command> autoChooser;
@@ -75,9 +78,11 @@ public class RobotContainer {
         allianceChooser.addOption("Blue", "Blue");
         SmartDashboard.putData("Alliance Color", allianceChooser);
 
-        // Drive mode chooser
-        fieldOrientedChooser.setDefaultOption("Field Oriented", false);
-        fieldOrientedChooser.addOption("Robot Oriented", true);
+        // Drive mode chooser — the boolean is passed straight to Drive.drive() as the
+        // `fieldRelative` flag, so true must mean field-oriented. (It was inverted:
+        // "Field Oriented" stored false, which made the default drive robot-centric.)
+        fieldOrientedChooser.setDefaultOption("Field Oriented", true);
+        fieldOrientedChooser.addOption("Robot Oriented", false);
         SmartDashboard.putData("Drive Mode", fieldOrientedChooser);
 
         configureBindings();
@@ -175,10 +180,11 @@ public class RobotContainer {
         forward *= MAX_LINEAR_SPEED_TELEOP;
         strafe *= MAX_LINEAR_SPEED_TELEOP;
 
-        // Slew-rate limit the translation so the robot accelerates smoothly instead
-        // of snapping to the stick's commanded speed instantly.
-        forward = m_linearSlew.calculate(forward);
-        strafe = m_linearSlew.calculate(strafe);
+        // Slew-rate limit each axis independently so the robot accelerates smoothly
+        // instead of snapping to the stick's commanded speed instantly. Separate
+        // limiters per axis so diagonal driving isn't coupled through a shared state.
+        forward = m_slewY.calculate(forward);
+        strafe = m_slewX.calculate(strafe);
 
         return new Translation2d(forward, strafe);
     }
