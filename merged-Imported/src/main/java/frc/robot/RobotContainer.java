@@ -11,6 +11,7 @@ import com.pathplanner.lib.auto.NamedCommands;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
+import frc.robot.SlewLimiter;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 
@@ -31,6 +32,13 @@ public class RobotContainer {
 
     private final CommandXboxController m_driverController = new CommandXboxController(0);
     private final CommandXboxController m_operatorController = new CommandXboxController(1);
+
+    // Slew-rate limiters smooth out sudden stick movements so the robot doesn't
+    // jerk when you whack the stick to full throttle. Shared across all commands
+    // that use getControls() (teleop + auto-aim + shoot-while-moving) because they
+    // all feed the same drivetrain, so a single limiter keeps handoffs smooth.
+    public static final SlewLimiter m_linearSlew = new SlewLimiter(Constants.DRIVE_SLEW_RATE_LINEAR);
+    public static final SlewLimiter m_angularSlew = new SlewLimiter(Constants.DRIVE_SLEW_RATE_ANGULAR);
 
     private final SendableChooser<Command> autoChooser;
     private final SendableChooser<String> allianceChooser = new SendableChooser<>();
@@ -81,7 +89,11 @@ public class RobotContainer {
         drive.setDefaultCommand(
             new RunCommand(() -> {
                 var controls = getControls(m_driverController);
-                var thetaInput = m_driverController.getRightX() * MAX_ANGULAR_SPEED * 0.5;
+                // Right stick controls rotation — same deadband + curve + slew treatment
+                // as the translation sticks so turning feels as planted as driving.
+                double rawTurn = m_driverController.getRightX();
+                double shapedTurn = Utils.shapeJoystick(rawTurn, Constants.DRIVE_DEADBAND, Constants.DRIVE_INPUT_EXPONENT);
+                double thetaInput = m_angularSlew.calculate(shapedTurn * MAX_ANGULAR_SPEED);
                 boolean fieldOriented = fieldOrientedChooser.getSelected();
                 drive.drive(controls.getX(), controls.getY(), thetaInput, fieldOriented);
             }, drive)
@@ -152,15 +164,21 @@ public class RobotContainer {
         double forward = controller.getLeftY();
         double strafe = controller.getLeftX();
 
-        forward = Math.copySign(forward * forward, forward);
-        strafe = Math.copySign(strafe * strafe, strafe);
+        // Deadband + response curve: kills stick creep and gives a tunable
+        // sensitivity profile (linear at 1.0, quadratic at 2.0, cubic at 3.0).
+        forward = Utils.shapeJoystick(forward, Constants.DRIVE_DEADBAND, Constants.DRIVE_INPUT_EXPONENT);
+        strafe = Utils.shapeJoystick(strafe, Constants.DRIVE_DEADBAND, Constants.DRIVE_INPUT_EXPONENT);
 
-        if (isRed) {
-            forward = forward;
-        }
+        // Alliance sign is handled by field-orientation in Drive.drive(); no per-axis
+        // flip is needed here.
 
         forward *= MAX_LINEAR_SPEED_TELEOP;
         strafe *= MAX_LINEAR_SPEED_TELEOP;
+
+        // Slew-rate limit the translation so the robot accelerates smoothly instead
+        // of snapping to the stick's commanded speed instantly.
+        forward = m_linearSlew.calculate(forward);
+        strafe = m_linearSlew.calculate(strafe);
 
         return new Translation2d(forward, strafe);
     }

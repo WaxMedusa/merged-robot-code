@@ -7,6 +7,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants;
 import frc.robot.LimelightHelpers;
 import frc.robot.RobotContainer;
+import frc.robot.Utils;
 import frc.robot.subsystems.Drive;
 
 public class AutoAimToTag extends Command {
@@ -54,7 +55,11 @@ public class AutoAimToTag extends Command {
                 SmartDashboard.putString("AutoAim/Status", "TURNING");
             }
         } else {
-            omega = -controller.getRightX() * kMaxOmega;
+            // No target: fall back to manual turn stick, with the same deadband + curve
+            // + slew treatment as the main drive command so the handoff feels seamless.
+            double rawTurn = -controller.getRightX();
+            double shapedTurn = Utils.shapeJoystick(rawTurn, Constants.DRIVE_DEADBAND, Constants.DRIVE_INPUT_EXPONENT);
+            omega = RobotContainer.m_angularSlew.calculate(shapedTurn * kMaxOmega);
             SmartDashboard.putString("AutoAim/Status", "NO TARGET");
         }
 
