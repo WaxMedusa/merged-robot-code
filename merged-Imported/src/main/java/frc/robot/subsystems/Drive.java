@@ -118,30 +118,26 @@ public class Drive extends SubsystemBase {
 
     /**
      * Drive with velocity commands (m/s, rad/s).
+     * Forward is +X, strafe-left is +Y (standard WPILib field-centric convention).
      */
     public void drive(double vxMps, double vyMps, double omegaRadPerSec, boolean fieldRelative) {
-        if (fieldRelative) {
-            drivetrain.setControl(fieldCentric
-                    .withVelocityX(vxMps)
-                    .withVelocityY(vyMps)
-                    .withRotationalRate(omegaRadPerSec));
-        } else {
-            drivetrain.setControl(robotCentric
-                    .withVelocityX(vxMps)
-                    .withVelocityY(vyMps)
-                    .withRotationalRate(omegaRadPerSec));
-        }
+        // Build request on-the-fly to avoid state issues with wither methods.
+        var request = fieldRelative
+                ? fieldCentric.withVelocityX(vxMps).withVelocityY(vyMps).withRotationalRate(omegaRadPerSec)
+                : robotCentric.withVelocityX(vxMps).withVelocityY(vyMps).withRotationalRate(omegaRadPerSec);
+        drivetrain.setControl(request);
     }
 
     /**
-     * Drive with translation commands and a heading target (field-centric).
+     * Drive with translation and heading target (field-centric).
+     * Used for path following: maintains motion toward heading while moving.
      */
     public void rotationPidDrive(double vxMps, double vyMps, double targetHeadingRad, double unused1,
             double unused2) {
         drivetrain.setControl(fieldCentricFacingAngle
-                .withVelocityX(-vxMps)
-                .withVelocityY(-vyMps)
-                .withTargetDirection(Rotation2d.fromRadians(-targetHeadingRad)));
+                .withVelocityX(vxMps)
+                .withVelocityY(vyMps)
+                .withTargetDirection(Rotation2d.fromRadians(targetHeadingRad)));
     }
 
     /**

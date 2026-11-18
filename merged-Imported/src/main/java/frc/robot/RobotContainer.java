@@ -181,12 +181,12 @@ public class RobotContainer {
         strafe *= MAX_LINEAR_SPEED_TELEOP;
 
         // Slew-rate limit each axis independently so the robot accelerates smoothly
-        // instead of snapping to the stick's commanded speed instantly. Separate
-        // limiters per axis so diagonal driving isn't coupled through a shared state.
-        forward = m_slewY.calculate(forward);
-        strafe = m_slewX.calculate(strafe);
+        // instead of snapping to the stick's commanded speed instantly.
+        forward = m_slewX.calculate(forward);
+        strafe = m_slewY.calculate(strafe);
 
-        return new Translation2d(forward, strafe);
+        // Translation2d(x, y): x=strafe (horizontal), y=forward (vertical).
+        return new Translation2d(strafe, forward);
     }
 
     public static boolean isRed() {
